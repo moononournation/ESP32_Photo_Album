@@ -1,0 +1,34 @@
+.config
+*.o
+*.pyc
+*.a
+*.d
+
+# gtags
+GTAGS
+GRTAGS
+GPATH
+
+# emacs
+.dir-locals.el
+
+# emacs temp file suffixes
+*~
+.#*
+\#*#
+
+sdkconfig
+sdkconfig.old
+.cproject
+.project
+.settings
+BUILD
+PBUILD
+build/
+temp/
+local/
+*.dis
+*.elf
+*.map
+**/.DS_Store
+.vscode/

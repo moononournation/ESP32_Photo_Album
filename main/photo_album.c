@@ -526,6 +526,7 @@ void app_main()
 	TFT_print("Initializing WiFi...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
 	initialise_wifi();
 
+	_fg = TFT_MAGENTA;
 	TFT_print("Download Photo from the Web...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
 	download_photo();
 }

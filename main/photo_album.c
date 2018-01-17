@@ -58,8 +58,9 @@
 #define MARGIN_X 12
 #define MARGIN_Y 12
 
-#define NTP_WAIT 20 // seconds to wait NTP return
-#define NTP_RETRY 3
+#define POWER_STABLE_DELAY 500 // milliseconds to wait on power up
+#define CONNECT_WIFI_TIMEOUT 10000 // milliseconds to wait WiFi connect
+#define HTTP_TIMEOUT 5 // seconds to wait HTTP request
 
 #define WAKE_PIN 12
 
@@ -169,13 +170,14 @@ static int http_request(const void *req_buf, int str_len)
 	int s;
 
 	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
-											false, true, portMAX_DELAY);
+											false, true, CONNECT_WIFI_TIMEOUT);
 
 	int err = getaddrinfo(WEB_SERVER, WEB_PORT, &hints, &res);
 
 	if (err != 0 || res == NULL)
 	{
 		ESP_LOGE(tag, "DNS lookup failed err=%d res=%p", err, res);
+		return -1;
 	}
 
 	/* Code to print the resolved IP.
@@ -187,12 +189,14 @@ static int http_request(const void *req_buf, int str_len)
 	if (s < 0)
 	{
 		ESP_LOGE(tag, "... Failed to allocate socket.");
+		return -1;
 	}
 	ESP_LOGI(tag, "... allocated socket");
 
 	if (connect(s, res->ai_addr, res->ai_addrlen) != 0)
 	{
 		ESP_LOGE(tag, "... socket connect failed errno=%d", errno);
+		return -1;
 	}
 
 	ESP_LOGI(tag, "... connected");
@@ -201,11 +205,12 @@ static int http_request(const void *req_buf, int str_len)
 	if (write(s, req_buf, str_len) < 0)
 	{
 		ESP_LOGE(tag, "... socket send failed");
+		return -1;
 	}
 	ESP_LOGI(tag, "... socket send success");
 
 	struct timeval receiving_timeout;
-	receiving_timeout.tv_sec = 5;
+	receiving_timeout.tv_sec = HTTP_TIMEOUT;
 	receiving_timeout.tv_usec = 0;
 	if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
 								 sizeof(receiving_timeout)) < 0)
@@ -227,140 +232,148 @@ static void download_photo()
 	ESP_LOGI(tag, "%s", req_buf);
 
 	int s = http_request(req_buf, str_len);
-	bool found_offset = false;
-	int curr_list_idx = 0;
-	int curr_filename_idx = 0;
-	r = read(s, recv_buf, sizeof(recv_buf));
-	for (int i = 0; i < r; i++)
+	if (s > 0)
 	{
-		putchar(recv_buf[i]); // output header for debug only
-		if (!found_offset)
-		{
-			// search response header end, double carriage return
-			if ((recv_buf[i] == '\r') && (recv_buf[i + 1] == '\n') && (recv_buf[i + 2] == '\r') && (recv_buf[i + 3] == '\n'))
-			{
-				found_offset = true;
-				i += 3;
-			}
-		}
-		else
-		{ // found_offset
-			if (recv_buf[i] == ',')
-			{
-				photo_list[curr_list_idx][curr_filename_idx] = 0;
-				curr_list_idx++;
-				curr_filename_idx = 0;
-			}
-			else
-			{
-				photo_list[curr_list_idx][curr_filename_idx++] = recv_buf[i];
-			}
-		}
-	}
-
-	do
-	{
+		bool found_offset = false;
+		int curr_list_idx = 0;
+		int curr_filename_idx = 0;
 		r = read(s, recv_buf, sizeof(recv_buf));
 		for (int i = 0; i < r; i++)
 		{
-			if (recv_buf[i] == ',')
+			putchar(recv_buf[i]); // output header for debug only
+			if (!found_offset)
 			{
-				photo_list[curr_list_idx][curr_filename_idx] = 0;
-				curr_list_idx++;
-				curr_filename_idx = 0;
+				// search response header end, double carriage return
+				if ((recv_buf[i] == '\r') && (recv_buf[i + 1] == '\n') && (recv_buf[i + 2] == '\r') && (recv_buf[i + 3] == '\n'))
+				{
+					found_offset = true;
+					i += 3;
+				}
 			}
 			else
-			{
-				photo_list[curr_list_idx][curr_filename_idx++] = recv_buf[i];
+			{ // found_offset
+				if (recv_buf[i] == ',')
+				{
+					photo_list[curr_list_idx][curr_filename_idx] = 0;
+					curr_list_idx++;
+					curr_filename_idx = 0;
+				}
+				else
+				{
+					photo_list[curr_list_idx][curr_filename_idx++] = recv_buf[i];
+				}
 			}
 		}
-	} while (r > 0);
-	close(s);
-	photo_list[curr_list_idx][curr_filename_idx] = 0;
 
-	char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
-	if (curr_list_idx > 0)
-	{
-		DIR *dp;
-		struct dirent *ep;
-		dp = opendir(SPIFFS_BASE_PATH "/");
-
-		if (dp != NULL)
+		do
 		{
-			while ((ep = readdir(dp)))
+			r = read(s, recv_buf, sizeof(recv_buf));
+			for (int i = 0; i < r; i++)
 			{
-				bool found_photo = false;
-				for (int i = 0; i <= curr_list_idx; i++)
+				if (recv_buf[i] == ',')
 				{
-					if (strcmp(photo_list[i], ep->d_name) == 0)
+					photo_list[curr_list_idx][curr_filename_idx] = 0;
+					curr_list_idx++;
+					curr_filename_idx = 0;
+				}
+				else
+				{
+					photo_list[curr_list_idx][curr_filename_idx++] = recv_buf[i];
+				}
+			}
+		} while (r > 0);
+		close(s);
+		photo_list[curr_list_idx][curr_filename_idx] = 0;
+
+		char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
+		if (curr_list_idx > 0)
+		{
+			DIR *dp;
+			struct dirent *ep;
+			dp = opendir(SPIFFS_BASE_PATH "/");
+
+			if (dp != NULL)
+			{
+				while ((ep = readdir(dp)))
+				{
+					bool found_photo = false;
+					for (int i = 0; i <= curr_list_idx; i++)
 					{
-						found_photo = true;
+						if (strcmp(photo_list[i], ep->d_name) == 0)
+						{
+							found_photo = true;
+						}
+					}
+					if (!found_photo)
+					{
+						sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
+						ESP_LOGI(tag, "Remove file: %s...", filename_buf);
+						unlink(filename_buf);
 					}
 				}
-				if (!found_photo)
+			}
+
+			for (int i = 0; i <= curr_list_idx; i++)
+			{
+				sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", photo_list[i]);
+
+				struct stat st;
+				if (stat(filename_buf, &st) != 0)
 				{
-					sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
-					ESP_LOGI(tag, "Remove file: %s...", filename_buf);
-					unlink(filename_buf);
+					str_len = sprintf(req_buf, REQUEST_FORMAT, photo_list[i]);
+					ESP_LOGI(tag, "%s", req_buf);
+
+					s = http_request(req_buf, str_len);
+					if (s > 0)
+					{
+						/* Read HTTP response */
+						FILE *f = fopen(filename_buf, "w");
+						if (f == NULL)
+						{
+							ESP_LOGE(tag, "Failed to open file for writing");
+						}
+						else
+						{
+							r = read(s, recv_buf, sizeof(recv_buf));
+							int offset = -1;
+							for (int i = 0; i < r; i++)
+							{
+								putchar(recv_buf[i]); // output header for debug only
+								// search response header end, double carriage return
+								if ((recv_buf[i] == '\r') && (recv_buf[i + 1] == '\n') && (recv_buf[i + 2] == '\r') && (recv_buf[i + 3] == '\n'))
+								{
+									offset = i + 4;
+								}
+							}
+							int file_size = 0;
+							// if found some response content at first buffer, start write from offset, otherwise start write from second buffer
+							if ((offset > 0) && (offset < r))
+							{
+								ESP_LOGI(tag, "Found response content offset: %d", offset);
+								// write response content (jpg file)
+								file_size += fwrite(recv_buf + offset, 1, r - offset, f);
+							}
+
+							do
+							{
+								r = read(s, recv_buf, sizeof(recv_buf));
+								file_size += fwrite(recv_buf, 1, r, f);
+							} while (r > 0);
+							fclose(f);
+							ESP_LOGI(tag, "File written: %d", file_size);
+						}
+						close(s);
+						ESP_LOGI(tag, "freemem=%d", esp_get_free_heap_size()); // show free heap for debug only
+					}
 				}
 			}
 		}
 	}
 
-	for (int i = 0; i <= curr_list_idx; i++)
-	{
-		sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", photo_list[i]);
-
-		struct stat st;
-		if (stat(filename_buf, &st) != 0)
-		{
-			str_len = sprintf(req_buf, REQUEST_FORMAT, photo_list[i]);
-			ESP_LOGI(tag, "%s", req_buf);
-
-			s = http_request(req_buf, str_len);
-
-			/* Read HTTP response */
-			FILE *f = fopen(filename_buf, "w");
-			if (f == NULL)
-			{
-				ESP_LOGE(tag, "Failed to open file for writing");
-			}
-			else
-			{
-				r = read(s, recv_buf, sizeof(recv_buf));
-				int offset = -1;
-				for (int i = 0; i < r; i++)
-				{
-					putchar(recv_buf[i]); // output header for debug only
-					// search response header end, double carriage return
-					if ((recv_buf[i] == '\r') && (recv_buf[i + 1] == '\n') && (recv_buf[i + 2] == '\r') && (recv_buf[i + 3] == '\n'))
-					{
-						offset = i + 4;
-					}
-				}
-				int file_size = 0;
-				// if found some response content at first buffer, start write from offset, otherwise start write from second buffer
-				if ((offset > 0) && (offset < r))
-				{
-					ESP_LOGI(tag, "Found response content offset: %d", offset);
-					// write response content (jpg file)
-					file_size += fwrite(recv_buf + offset, 1, r - offset, f);
-				}
-
-				do
-				{
-					r = read(s, recv_buf, sizeof(recv_buf));
-					file_size += fwrite(recv_buf, 1, r, f);
-				} while (r > 0);
-				fclose(f);
-				ESP_LOGI(tag, "File written: %d", file_size);
-			}
-			close(s);
-			ESP_LOGI(tag, "freemem=%d", esp_get_free_heap_size()); // show free heap for debug only
-		}
-	}
-
+	// save power
 	esp_wifi_stop();
+
+	// mark downloaded
 	xEventGroupSetBits(wifi_event_group, DOWNLOADED_BIT);
 }
 
@@ -404,6 +417,9 @@ static void display_photo_task()
 //=============
 void app_main()
 {
+	// wait power become stable
+	vTaskDelay(POWER_STABLE_DELAY / portTICK_RATE_MS);
+
 	// ========  PREPARE DISPLAY INITIALIZATION  =========
 
 	// === SET GLOBAL VARIABLES ==========================
@@ -509,7 +525,7 @@ void app_main()
 	TFT_print("ESP32 Photo Album", MARGIN_X, MARGIN_Y);
 
 	_fg = TFT_YELLOW;
-	TFT_print("Initializing SPIFFS", MARGIN_X, LASTY + TFT_getfontheight() + 2);
+	TFT_print("Initializing SPIFFS...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
 	// ==== Initialize the file system ====
 	esp_vfs_spiffs_conf_t conf = {
 			.base_path = SPIFFS_BASE_PATH,
@@ -522,14 +538,14 @@ void app_main()
 	ESP_ERROR_CHECK(esp_vfs_spiffs_register(&conf));
 
 	_fg = TFT_GREEN;
-	TFT_print("Start DISPLAY PHOTO TASK...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
-	xTaskCreate(&display_photo_task, "display_photo_task", 4096, NULL, 4, NULL);
-
-	_fg = TFT_BLUE;
 	TFT_print("Initializing WiFi...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
 	initialise_wifi();
 
+	_fg = TFT_BLUE;
+	TFT_print("Start display photo task...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
+	xTaskCreate(&display_photo_task, "display_photo_task", 4096, NULL, 4, NULL);
+
 	_fg = TFT_MAGENTA;
-	TFT_print("Download Photo from the Web...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
+	TFT_print("Download new photo...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
 	download_photo();
 }

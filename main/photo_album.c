@@ -278,9 +278,9 @@ static void download_photo()
 	close(s);
 	photo_list[curr_list_idx][curr_filename_idx] = 0;
 
+	char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
 	if (curr_list_idx > 0)
 	{
-		char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
 		DIR *dp;
 		struct dirent *ep;
 		dp = opendir(SPIFFS_BASE_PATH "/");

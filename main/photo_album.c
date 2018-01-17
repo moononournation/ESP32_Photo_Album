@@ -278,28 +278,31 @@ static void download_photo()
 	close(s);
 	photo_list[curr_list_idx][curr_filename_idx] = 0;
 
-	char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
-	DIR *dp;
-	struct dirent *ep;
-	dp = opendir(SPIFFS_BASE_PATH "/");
-
-	if (dp != NULL)
+	if (curr_list_idx > 0)
 	{
-		while ((ep = readdir(dp)))
+		char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
+		DIR *dp;
+		struct dirent *ep;
+		dp = opendir(SPIFFS_BASE_PATH "/");
+
+		if (dp != NULL)
 		{
-			bool found_photo = false;
-			for (int i = 0; i <= curr_list_idx; i++)
+			while ((ep = readdir(dp)))
 			{
-				if (strcmp(photo_list[i], ep->d_name) == 0)
+				bool found_photo = false;
+				for (int i = 0; i <= curr_list_idx; i++)
 				{
-					found_photo = true;
+					if (strcmp(photo_list[i], ep->d_name) == 0)
+					{
+						found_photo = true;
+					}
 				}
-			}
-			if (!found_photo)
-			{
-				sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
-				ESP_LOGI(tag, "Remove file: %s...", filename_buf);
-				unlink(filename_buf);
+				if (!found_photo)
+				{
+					sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
+					ESP_LOGI(tag, "Remove file: %s...", filename_buf);
+					unlink(filename_buf);
+				}
 			}
 		}
 	}

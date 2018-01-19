@@ -66,7 +66,7 @@
 
 #define FILENAME_SIZE 20
 #define PHOTO_LIST_SIZE 150
-#define SHOW_PHOTO_COUNT 5 // number of photos show before enter deep sleep
+#define SHOW_PHOTO_COUNT 5			 // number of photos show before enter deep sleep
 #define SHOW_PHOTO_INTERVAL 5000 // milliseconds to wait for showing next photo
 
 // Uncomment define for displaying battery life performance tracing
@@ -384,24 +384,24 @@ static void download_photo()
 
 static void display_photo_task()
 {
-	DIR *dp;
-	struct dirent *ep;
-	dp = opendir(SPIFFS_BASE_PATH "/");
-	int photo_count = 0;
-
-	if (dp != NULL)
+	char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
+	for (int i = 0; i < SHOW_PHOTO_COUNT; i++)
 	{
-		while ((ep = readdir(dp)))
+		DIR *dp;
+		struct dirent *ep;
+		dp = opendir(SPIFFS_BASE_PATH "/");
+		int photo_count = 0;
+
+		if (dp != NULL)
 		{
-			ESP_LOGI(tag, "SPIFFS file %d: %s...", photo_count, ep->d_name);
-			photo_count++;
+			while ((ep = readdir(dp)))
+			{
+				ESP_LOGI(tag, "SPIFFS file %d: %s...", photo_count, ep->d_name);
+				photo_count++;
+			}
 		}
-	}
 
-	if (photo_count)
-	{
-		char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
-		for (int i = 0; i < SHOW_PHOTO_COUNT; i++)
+		if (photo_count)
 		{
 			seekdir(dp, (esp_random() % photo_count));
 			ep = readdir(dp);
@@ -417,8 +417,8 @@ static void display_photo_task()
 			_fg = TFT_WHITE;
 			TFT_print(str_buf, MARGIN_X, MARGIN_Y);
 #endif
-			vTaskDelay(SHOW_PHOTO_INTERVAL / portTICK_PERIOD_MS);
 		}
+		vTaskDelay(SHOW_PHOTO_INTERVAL / portTICK_PERIOD_MS);
 	}
 
 	xEventGroupWaitBits(wifi_event_group, DOWNLOADED_BIT,
@@ -433,7 +433,7 @@ void app_main()
 	vTaskDelay(POWER_STABLE_DELAY / portTICK_RATE_MS);
 
 	// ========  PREPARE DISPLAY INITIALIZATION  =========
-  // Please change all TFT related parameters at:
+	// Please change all TFT related parameters at:
 	// components/tft/tft.h
 	tft_disp_type = DEFAULT_DISP_TYPE;
 	_width = DEFAULT_TFT_DISPLAY_WIDTH;

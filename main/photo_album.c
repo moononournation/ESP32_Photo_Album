@@ -55,8 +55,8 @@
 #define TIMEZONE 8 // hour offset
 #define TIMEADJ 20 // seconds advanced real time for prefetch and load image
 
-#define MARGIN_X 12
-#define MARGIN_Y 12
+#define MARGIN_X 0
+#define MARGIN_Y 0
 
 #define POWER_STABLE_DELAY 500		 // milliseconds to wait on power up
 #define CONNECT_WIFI_TIMEOUT 10000 // milliseconds to wait WiFi connect
@@ -66,9 +66,10 @@
 
 #define FILENAME_SIZE 20
 #define PHOTO_LIST_SIZE 150
-#define SHOW_PHOTO_COUNT 5
+#define SHOW_PHOTO_COUNT 5 // number of photos show before enter deep sleep
+#define SHOW_PHOTO_INTERVAL 5000 // milliseconds to wait for showing next photo
 
-// extra display for tracing battery life performance
+// Uncomment define for displaying battery life performance tracing
 //#define BATTERY_LIFE_TRACE
 #ifdef BATTERY_LIFE_TRACE
 RTC_DATA_ATTR int downloaded_photo = 0;
@@ -90,20 +91,14 @@ const int DOWNLOADED_BIT = 0x00000010;
 // The web server that getting the time picture,
 // this is one of the famous site, you may search
 // more on the web.
-#define WEB_SERVER "10.0.1.6"
-#define WEB_PORT "3200"
 static const char *PHOTO_LIST_REQUEST =
 		"GET / HTTP/1.0\r\n"
-		"Host: " WEB_SERVER "\r\n"
+		"Host: " CONFIG_WEB_SERVER "\r\n"
 		"User-Agent: esp-idf/1.0 esp32\r\n"
 		"\r\n";
 static const char *REQUEST_FORMAT =
-		// "GET http://" WEB_SERVER "/assets/toppict/jp/t1/%.2d%.2d.jpg HTTP/1.0\r\n"
-		// "GET http://" WEB_SERVER "/assets/pict/jp/pc/%.2d%.2d.jpg HTTP/1.0\r\n"
-		// "GET http://" WEB_SERVER "/assets/pict/hiroshima/pc/%.2d%.2d.jpg HTTP/1.0\r\n"
-		// "GET http://" WEB_SERVER ":" WEB_PORT "/%.2d.jpg HTTP/1.0\r\n"
 		"GET /%s HTTP/1.0\r\n"
-		"Host: " WEB_SERVER "\r\n"
+		"Host: " CONFIG_WEB_SERVER "\r\n"
 		"User-Agent: esp-idf/1.0 esp32\r\n"
 		"\r\n";
 // ==========================================================
@@ -179,7 +174,7 @@ static int http_request(const void *req_buf, int str_len)
 	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
 											false, true, CONNECT_WIFI_TIMEOUT);
 
-	int err = getaddrinfo(WEB_SERVER, WEB_PORT, &hints, &res);
+	int err = getaddrinfo(CONFIG_WEB_SERVER, CONFIG_WEB_PORT, &hints, &res);
 
 	if (err != 0 || res == NULL)
 	{
@@ -422,7 +417,7 @@ static void display_photo_task()
 			_fg = TFT_WHITE;
 			TFT_print(str_buf, MARGIN_X, MARGIN_Y);
 #endif
-			vTaskDelay(5000 / portTICK_PERIOD_MS);
+			vTaskDelay(SHOW_PHOTO_INTERVAL / portTICK_PERIOD_MS);
 		}
 	}
 

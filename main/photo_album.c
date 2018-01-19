@@ -433,25 +433,11 @@ void app_main()
 	vTaskDelay(POWER_STABLE_DELAY / portTICK_RATE_MS);
 
 	// ========  PREPARE DISPLAY INITIALIZATION  =========
-
-	// === SET GLOBAL VARIABLES ==========================
-
-	// ===================================================
-	// ==== Set display type                         =====
+  // Please change all TFT related parameters at:
+	// components/tft/tft.h
 	tft_disp_type = DEFAULT_DISP_TYPE;
-	//tft_disp_type = DISP_TYPE_ILI9341;
-	//tft_disp_type = DISP_TYPE_ILI9488;
-	//tft_disp_type = DISP_TYPE_ST7735B;
-	// ===================================================
-
-	// ===================================================
-	// === Set display resolution if NOT using default ===
-	// === DEFAULT_TFT_DISPLAY_WIDTH &                 ===
-	// === DEFAULT_TFT_DISPLAY_HEIGHT                  ===
-	_width = DEFAULT_TFT_DISPLAY_WIDTH;		// smaller dimension
-	_height = DEFAULT_TFT_DISPLAY_HEIGHT; // larger dimension
-	//_width = 128;  // smaller dimension
-	//_height = 160; // larger dimension
+	_width = DEFAULT_TFT_DISPLAY_WIDTH;
+	_height = DEFAULT_TFT_DISPLAY_HEIGHT;
 	// ===================================================
 
 	// ===================================================

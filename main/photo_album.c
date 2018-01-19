@@ -58,15 +58,22 @@
 #define MARGIN_X 12
 #define MARGIN_Y 12
 
-#define POWER_STABLE_DELAY 500 // milliseconds to wait on power up
+#define POWER_STABLE_DELAY 500		 // milliseconds to wait on power up
 #define CONNECT_WIFI_TIMEOUT 10000 // milliseconds to wait WiFi connect
-#define HTTP_TIMEOUT 5 // seconds to wait HTTP request
+#define HTTP_TIMEOUT 5						 // seconds to wait HTTP request
 
 #define WAKE_PIN 12
 
 #define FILENAME_SIZE 20
 #define PHOTO_LIST_SIZE 150
 #define SHOW_PHOTO_COUNT 5
+
+// extra display for tracing battery life performance
+//#define BATTERY_LIFE_TRACE
+#ifdef BATTERY_LIFE_TRACE
+RTC_DATA_ATTR int downloaded_photo = 0;
+RTC_DATA_ATTR int displayed_photo = 0;
+#endif
 
 static const char tag[] = "[Photo Album]";
 
@@ -361,6 +368,9 @@ static void download_photo()
 							} while (r > 0);
 							fclose(f);
 							ESP_LOGI(tag, "File written: %d", file_size);
+#ifdef BATTERY_LIFE_TRACE
+							downloaded_photo++;
+#endif
 						}
 						close(s);
 						ESP_LOGI(tag, "freemem=%d", esp_get_free_heap_size()); // show free heap for debug only
@@ -405,6 +415,13 @@ static void display_photo_task()
 
 			TFT_jpg_image(CENTER, CENTER, 0, -1, filename_buf, NULL, 0);
 
+#ifdef BATTERY_LIFE_TRACE
+			displayed_photo++;
+			char str_buf[32];
+			sprintf(str_buf, "%d download, %d display", downloaded_photo, displayed_photo);
+			_fg = TFT_WHITE;
+			TFT_print(str_buf, MARGIN_X, MARGIN_Y);
+#endif
 			vTaskDelay(5000 / portTICK_PERIOD_MS);
 		}
 	}

@@ -55,8 +55,8 @@
 #define TIMEZONE 8 // hour offset
 #define TIMEADJ 20 // seconds advanced real time for prefetch and load image
 
-#define MARGIN_X 0
-#define MARGIN_Y 0
+#define MARGIN_X 4
+#define MARGIN_Y 4
 
 #define POWER_STABLE_DELAY 500		 // milliseconds to wait on power up
 #define CONNECT_WIFI_TIMEOUT 10000 // milliseconds to wait WiFi connect
@@ -412,6 +412,7 @@ static void display_photo_task()
 
 #ifdef BATTERY_LIFE_TRACE
 			displayed_photo++;
+			TFT_fillRect(MARGIN_X, MARGIN_Y, 160, TFT_getfontheight(), TFT_BLACK);
 			char str_buf[32];
 			sprintf(str_buf, "%d download, %d display", downloaded_photo, displayed_photo);
 			_fg = TFT_WHITE;

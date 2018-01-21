@@ -69,6 +69,9 @@
 #define SHOW_PHOTO_COUNT 5			 // number of photos show before enter deep sleep
 #define SHOW_PHOTO_INTERVAL 5000 // milliseconds to wait for showing next photo
 
+// Uncomment for power saving by reducing logic on serial communication
+//#define NO_LOG
+
 // Uncomment define for displaying battery life performance tracing
 //#define BATTERY_LIFE_TRACE
 #ifdef BATTERY_LIFE_TRACE
@@ -143,7 +146,9 @@ static void initialise_wifi(void)
 			},
 	};
 
+#ifndef NO_LOG
 	ESP_LOGI(tag, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
+#endif
 
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
 	ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
@@ -152,7 +157,9 @@ static void initialise_wifi(void)
 
 static void enter_sleep()
 {
+#ifndef NO_LOG
 	ESP_LOGI(tag, "Enter sleep...");
+#endif
 
 	gpio_set_level(PIN_NUM_BCKL, PIN_BCKL_OFF);
 	esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
@@ -169,7 +176,6 @@ static int http_request(const void *req_buf, int str_len)
 			.ai_socktype = SOCK_STREAM,
 	};
 	struct addrinfo *res;
-	struct in_addr *addr;
 	int s;
 
 	xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
@@ -179,38 +185,54 @@ static int http_request(const void *req_buf, int str_len)
 
 	if (err != 0 || res == NULL)
 	{
+#ifndef NO_LOG
 		ESP_LOGE(tag, "DNS lookup failed err=%d res=%p", err, res);
+#endif
 		return -1;
 	}
 
+#ifndef NO_LOG
 	/* Code to print the resolved IP.
            Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
-	addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
+	struct in_addr *addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
 	ESP_LOGI(tag, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
+#endif
 
 	s = socket(res->ai_family, res->ai_socktype, 0);
 	if (s < 0)
 	{
+#ifndef NO_LOG
 		ESP_LOGE(tag, "... Failed to allocate socket.");
+#endif
 		return -1;
 	}
+#ifndef NO_LOG
 	ESP_LOGI(tag, "... allocated socket");
+#endif
 
 	if (connect(s, res->ai_addr, res->ai_addrlen) != 0)
 	{
+#ifndef NO_LOG
 		ESP_LOGE(tag, "... socket connect failed errno=%d", errno);
+#endif
 		return -1;
 	}
 
+#ifndef NO_LOG
 	ESP_LOGI(tag, "... connected");
+#endif
 	freeaddrinfo(res);
 
 	if (write(s, req_buf, str_len) < 0)
 	{
+#ifndef NO_LOG
 		ESP_LOGE(tag, "... socket send failed");
+#endif
 		return -1;
 	}
+#ifndef NO_LOG
 	ESP_LOGI(tag, "... socket send success");
+#endif
 
 	struct timeval receiving_timeout;
 	receiving_timeout.tv_sec = HTTP_TIMEOUT;
@@ -218,9 +240,13 @@ static int http_request(const void *req_buf, int str_len)
 	if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout,
 								 sizeof(receiving_timeout)) < 0)
 	{
+#ifndef NO_LOG
 		ESP_LOGE(tag, "... failed to set socket receiving timeout");
+#endif
 	}
+#ifndef NO_LOG
 	ESP_LOGI(tag, "... set socket receiving timeout success");
+#endif
 
 	return s; // return socket
 }
@@ -232,7 +258,9 @@ static void download_photo()
 	char req_buf[128];
 	char recv_buf[512]; // assume response header must smaller than buffer size
 	int str_len = sprintf(req_buf, PHOTO_LIST_REQUEST);
+#ifndef NO_LOG
 	ESP_LOGI(tag, "%s", req_buf);
+#endif
 
 	int s = http_request(req_buf, str_len);
 	if (s > 0)
@@ -243,7 +271,9 @@ static void download_photo()
 		r = read(s, recv_buf, sizeof(recv_buf));
 		for (int i = 0; i < r; i++)
 		{
+#ifndef NO_LOG
 			putchar(recv_buf[i]); // output header for debug only
+#endif
 			if (!found_offset)
 			{
 				// search response header end, double carriage return
@@ -310,7 +340,9 @@ static void download_photo()
 					if (!found_photo)
 					{
 						sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
+#ifndef NO_LOG
 						ESP_LOGI(tag, "Remove file: %s...", filename_buf);
+#endif
 						unlink(filename_buf);
 					}
 				}
@@ -324,7 +356,9 @@ static void download_photo()
 				if (stat(filename_buf, &st) != 0)
 				{
 					str_len = sprintf(req_buf, REQUEST_FORMAT, photo_list[i]);
+#ifndef NO_LOG
 					ESP_LOGI(tag, "%s", req_buf);
+#endif
 
 					s = http_request(req_buf, str_len);
 					if (s > 0)
@@ -333,7 +367,9 @@ static void download_photo()
 						FILE *f = fopen(filename_buf, "w");
 						if (f == NULL)
 						{
+#ifndef NO_LOG
 							ESP_LOGE(tag, "Failed to open file for writing");
+#endif
 						}
 						else
 						{
@@ -341,7 +377,9 @@ static void download_photo()
 							int offset = -1;
 							for (int i = 0; i < r; i++)
 							{
+#ifndef NO_LOG
 								putchar(recv_buf[i]); // output header for debug only
+#endif
 								// search response header end, double carriage return
 								if ((recv_buf[i] == '\r') && (recv_buf[i + 1] == '\n') && (recv_buf[i + 2] == '\r') && (recv_buf[i + 3] == '\n'))
 								{
@@ -352,7 +390,9 @@ static void download_photo()
 							// if found some response content at first buffer, start write from offset, otherwise start write from second buffer
 							if ((offset > 0) && (offset < r))
 							{
+#ifndef NO_LOG
 								ESP_LOGI(tag, "Found response content offset: %d", offset);
+#endif
 								// write response content (jpg file)
 								file_size += fwrite(recv_buf + offset, 1, r - offset, f);
 							}
@@ -363,13 +403,18 @@ static void download_photo()
 								file_size += fwrite(recv_buf, 1, r, f);
 							} while (r > 0);
 							fclose(f);
+#ifndef NO_LOG
 							ESP_LOGI(tag, "File written: %d", file_size);
+#endif
+
 #ifdef BATTERY_LIFE_TRACE
 							downloaded_photo++;
 #endif
 						}
 						close(s);
+#ifndef NO_LOG
 						ESP_LOGI(tag, "freemem=%d", esp_get_free_heap_size()); // show free heap for debug only
+#endif
 					}
 				}
 			}
@@ -397,7 +442,9 @@ static void display_photo_task()
 		{
 			while ((ep = readdir(dp)))
 			{
+#ifndef NO_LOG
 				ESP_LOGI(tag, "SPIFFS file %d: %s...", photo_count, ep->d_name);
+#endif
 				photo_count++;
 			}
 		}
@@ -407,8 +454,9 @@ static void display_photo_task()
 			seekdir(dp, (esp_random() % photo_count));
 			ep = readdir(dp);
 			sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
+#ifndef NO_LOG
 			ESP_LOGI(tag, "Display %s...", filename_buf);
-
+#endif
 			displaying_photo = true;
 			TFT_jpg_image(CENTER, CENTER, 0, -1, filename_buf, NULL, 0);
 
@@ -474,38 +522,52 @@ void app_main()
 	// ====================================================================================================================
 
 	vTaskDelay(500 / portTICK_RATE_MS);
+#ifndef NO_LOG
 	printf("\r\n==============================\r\n");
 	printf("Pins used: miso=%d, mosi=%d, sck=%d, cs=%d\r\n", PIN_NUM_MISO, PIN_NUM_MOSI, PIN_NUM_CLK, PIN_NUM_CS);
 	printf("==============================\r\n\r\n");
+#endif
 
 	// ==================================================================
 	// ==== Initialize the SPI bus and attach the LCD to the SPI bus ====
 
 	ESP_ERROR_CHECK(spi_lobo_bus_add_device(SPI_BUS, &buscfg, &devcfg, &spi));
+#ifndef NO_LOG
 	printf("SPI: display device added to spi bus (%d)\r\n", SPI_BUS);
+#endif
 	disp_spi = spi;
 
 	// ==== Test select/deselect ====
 	ESP_ERROR_CHECK(spi_lobo_device_select(spi, 1));
 	ESP_ERROR_CHECK(spi_lobo_device_deselect(spi));
 
+#ifndef NO_LOG
 	printf("SPI: attached display device, speed=%u\r\n", spi_lobo_get_speed(spi));
 	printf("SPI: bus uses native pins: %s\r\n", spi_lobo_uses_native_pins(spi) ? "true" : "false");
+#endif
 
 	// ================================
 	// ==== Initialize the Display ====
 
+#ifndef NO_LOG
 	printf("SPI: display init...\r\n");
+#endif
 	TFT_display_init();
+#ifndef NO_LOG
 	printf("OK\r\n");
+#endif
 
 	// ---- Detect maximum read speed ----
 	max_rdclock = find_rd_speed();
+#ifndef NO_LOG
 	printf("SPI: Max rd speed = %u\r\n", max_rdclock);
+#endif
 
 	// ==== Set SPI clock used for display operations ====
 	spi_lobo_set_speed(spi, DEFAULT_SPI_CLOCK);
+#ifndef NO_LOG
 	printf("SPI: Changed speed to %u\r\n", spi_lobo_get_speed(spi));
+#endif
 
 	font_rotate = 0;
 	text_wrap = 0;

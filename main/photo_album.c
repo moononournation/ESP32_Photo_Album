@@ -75,9 +75,9 @@
 // Uncomment define for displaying battery life performance tracing
 //#define BATTERY_LIFE_TRACE
 #ifdef BATTERY_LIFE_TRACE
-RTC_DATA_ATTR int downloaded_photo = 0;
 RTC_DATA_ATTR int displayed_photo = 0;
 #endif
+static int photo_count = 0;
 static bool displaying_photo = false;
 
 static const char tag[] = "[Photo Album]";
@@ -406,10 +406,6 @@ static void download_photo()
 #ifndef NO_LOG
 							ESP_LOGI(tag, "File written: %d", file_size);
 #endif
-
-#ifdef BATTERY_LIFE_TRACE
-							downloaded_photo++;
-#endif
 						}
 						close(s);
 #ifndef NO_LOG
@@ -433,10 +429,9 @@ static void display_photo_task()
 	char filename_buf[FILENAME_SIZE + sizeof(SPIFFS_BASE_PATH)];
 	for (int i = 0; i < SHOW_PHOTO_COUNT; i++)
 	{
-		DIR *dp;
 		struct dirent *ep;
-		dp = opendir(SPIFFS_BASE_PATH "/");
-		int photo_count = 0;
+		DIR *dp = opendir(SPIFFS_BASE_PATH "/");
+		photo_count = 0;
 
 		if (dp != NULL)
 		{
@@ -462,11 +457,11 @@ static void display_photo_task()
 
 #ifdef BATTERY_LIFE_TRACE
 			displayed_photo++;
-			TFT_fillRect(MARGIN_X, MARGIN_Y, 160, TFT_getfontheight(), TFT_BLACK);
+			TFT_fillRect(80, 227, 160, 13, TFT_BLACK);
 			char str_buf[32];
-			sprintf(str_buf, "%d download, %d display", downloaded_photo, displayed_photo);
+			sprintf(str_buf, "%d photos, %d display", photo_count, displayed_photo);
 			_fg = TFT_WHITE;
-			TFT_print(str_buf, MARGIN_X, MARGIN_Y);
+			TFT_print(str_buf, CENTER, 227);
 #endif
 		}
 		vTaskDelay(SHOW_PHOTO_INTERVAL / portTICK_PERIOD_MS);

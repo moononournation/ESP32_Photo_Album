@@ -58,7 +58,7 @@
 #define MARGIN_X 4
 #define MARGIN_Y 4
 
-#define POWER_STABLE_DELAY 500		 // milliseconds to wait on power up
+#define POWER_STABLE_DELAY 500		 // milliseconds to wait before turn on WiFi
 #define CONNECT_WIFI_TIMEOUT 10000 // milliseconds to wait WiFi connect
 #define HTTP_TIMEOUT 5						 // seconds to wait HTTP request
 
@@ -75,6 +75,7 @@
 RTC_DATA_ATTR int downloaded_photo = 0;
 RTC_DATA_ATTR int displayed_photo = 0;
 #endif
+static bool displaying_photo = false;
 
 static const char tag[] = "[Photo Album]";
 
@@ -408,6 +409,7 @@ static void display_photo_task()
 			sprintf(filename_buf, SPIFFS_BASE_PATH "/%s", ep->d_name);
 			ESP_LOGI(tag, "Display %s...", filename_buf);
 
+			displaying_photo = true;
 			TFT_jpg_image(CENTER, CENTER, 0, -1, filename_buf, NULL, 0);
 
 #ifdef BATTERY_LIFE_TRACE
@@ -430,9 +432,6 @@ static void display_photo_task()
 //=============
 void app_main()
 {
-	// wait power become stable
-	vTaskDelay(POWER_STABLE_DELAY / portTICK_RATE_MS);
-
 	// ========  PREPARE DISPLAY INITIALIZATION  =========
 	// Please change all TFT related parameters at:
 	// components/tft/tft.h
@@ -537,14 +536,23 @@ void app_main()
 	ESP_ERROR_CHECK(esp_vfs_spiffs_register(&conf));
 
 	_fg = TFT_GREEN;
-	TFT_print("Initializing WiFi...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
-	initialise_wifi();
-
-	_fg = TFT_BLUE;
 	TFT_print("Start display photo task...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
 	xTaskCreate(&display_photo_task, "display_photo_task", 4096, NULL, 4, NULL);
 
-	_fg = TFT_MAGENTA;
-	TFT_print("Download new photo...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
+	// wait power become stable
+	vTaskDelay(POWER_STABLE_DELAY / portTICK_RATE_MS);
+
+	if (!displaying_photo)
+	{
+		_fg = TFT_BLUE;
+		TFT_print("Initializing WiFi...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
+	}
+	initialise_wifi();
+
+	if (!displaying_photo)
+	{
+		_fg = TFT_MAGENTA;
+		TFT_print("Download new photo...", MARGIN_X, LASTY + TFT_getfontheight() + 2);
+	}
 	download_photo();
 }

@@ -48,6 +48,7 @@
 #define DEFAULT_SPI_CLOCK           26000000
 #define TFT_INVERT_ROTATION         0
 #define TFT_INVERT_ROTATION1        1
+#define TFT_INVERT_COLOR            0
 #define TFT_RGB_BGR                 0x00
 
 #define USE_TOUCH	TOUCH_TYPE_NONE
@@ -77,6 +78,7 @@
 #define DEFAULT_SPI_CLOCK           26000000
 #define TFT_INVERT_ROTATION         0
 #define TFT_INVERT_ROTATION1        0
+#define TFT_INVERT_COLOR            0
 #define TFT_RGB_BGR                 0x08
 
 #define USE_TOUCH                   TOUCH_TYPE_STMPE610
@@ -107,6 +109,12 @@
 // #############################################
 #define TFT_INVERT_ROTATION 0
 #define TFT_INVERT_ROTATION1 1
+
+// #############################################
+// ### Set to 1 for some displays,           ###
+//     for example IPS                       ###
+// #############################################
+#define TFT_INVERT_COLOR 0
 
 // ################################################
 // ### SET TO 0X00 FOR DISPLAYS WITH RGB MATRIX ###
@@ -300,9 +308,9 @@ typedef struct __attribute__((__packed__)) {
 // ====================================
 static const uint8_t ST7789V_init[] = {
 #if PIN_NUM_RST
-  15,                   					        // 15 commands in list
+  16,                   					        // 15 commands in list
 #else
-  16,                   					        // 16 commands in list
+  17,                   					        // 16 commands in list
   TFT_CMD_SWRESET, TFT_CMD_DELAY,					//  1: Software reset, no args, w/delay
   200,												//     200 ms delay
 #endif
@@ -319,6 +327,11 @@ static const uint8_t ST7789V_init[] = {
   TFT_CMD_GMCTRN1, 14, 0xD0, 0x00, 0x05, 0x0D, 0x0C, 0x06, 0x2D, 0x44, 0x40, 0x0E, 0x1C, 0x18, 0x16, 0x19,
   TFT_MADCTL, 1, (MADCTL_MX | TFT_RGB_BGR),			// Memory Access Control (orientation)
   TFT_CMD_PIXFMT, 1, DISP_COLOR_BITS_24,            // *** INTERFACE PIXEL FORMAT: 0x66 -> 18 bit; 0x55 -> 16 bit
+#if TFT_INVERT_COLOR == 1
+  TFT_INVONN, 0,
+#else
+  TFT_INVOFF, 0,
+#endif
   TFT_CMD_SLPOUT, TFT_CMD_DELAY, 120,				//  Sleep out,	//  120 ms delay
   TFT_DISPON, TFT_CMD_DELAY, 120,
 };
@@ -348,7 +361,11 @@ static const uint8_t ILI9341_init[] = {
   (MADCTL_MX | TFT_RGB_BGR),
   // *** INTERFACE PIXEL FORMAT: 0x66 -> 18 bit; 0x55 -> 16 bit
   TFT_CMD_PIXFMT, 1, DISP_COLOR_BITS_24,
+#if TFT_INVERT_COLOR == 1
+  TFT_INVONN, 0,
+#else
   TFT_INVOFF, 0,
+#endif
   TFT_CMD_FRMCTR1, 2, 0x00, 0x18,
   TFT_CMD_DFUNCTR, 4, 0x08, 0x82, 0x27, 0x00,		// Display Function Control
   TFT_PTLAR, 4, 0x00, 0x00, 0x01, 0x3F,
@@ -533,7 +550,11 @@ static const uint8_t  STP7735R_init[] = {
   0x8A, 0xEE,
   ST7735_VMCTR1 , 1      ,	// 12: Power control, 1 arg, no delay:
   0x0E,
+#if TFT_INVERT_COLOR == 1
+  TFT_INVONN, 0,
+#else
   TFT_INVOFF , 0      ,		// 13: Don't invert display, no args, no delay
+#endif
   TFT_MADCTL , 1      ,		// 14: Memory access control (directions), 1 arg:
   0xC0,						//     row addr/col addr, bottom to top refresh, RGB order
   TFT_CMD_PIXFMT , 1+TFT_CMD_DELAY,	//  15: Set color mode, 1 arg + delay:

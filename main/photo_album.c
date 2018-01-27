@@ -62,7 +62,14 @@
 #define CONNECT_WIFI_TIMEOUT 10000 // milliseconds to wait WiFi connect
 #define HTTP_TIMEOUT 5						 // seconds to wait HTTP request
 
+#if CONFIG_EXAMPLE_DISPLAY_TYPE == 3
+// select one only
+//#define WAKE_PIN 37 // m5stack left button
+#define WAKE_PIN 38 // m5stack center button
+//#define WAKE_PIN 39 // m5stack right button
+#else
 #define WAKE_PIN 12
+#endif
 
 #define FILENAME_SIZE 20
 #define PHOTO_LIST_SIZE 150
